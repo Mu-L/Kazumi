@@ -39,7 +39,7 @@ class _TimelinePageState extends State<TimelinePage>
           Provider.of<SideNavigationBarState>(context, listen: false);
     }
     if (timelineController.bangumiCalendar.isEmpty) {
-      debugPrint('时间表缓存为空, 尝试重新加载');
+      // debugPrint('时间表缓存为空, 尝试重新加载');
       timelineController.getSchedules();
     }
   }
@@ -79,7 +79,10 @@ class _TimelinePageState extends State<TimelinePage>
     return Observer(builder: (context) {
       return PopScope(
         canPop: false,
-        onPopInvoked: (bool didPop) async {
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (didPop) {
+            return;
+          }
           onBackPressed(context);
         },
         child: Scaffold(

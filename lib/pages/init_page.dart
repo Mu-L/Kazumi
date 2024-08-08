@@ -1,10 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:kazumi/pages/my/my_controller.dart';
 import 'package:kazumi/utils/webdav.dart';
 import 'package:kazumi/utils/storage.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:logger/logger.dart';
+import 'package:fvp/fvp.dart' as fvp;
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:kazumi/utils/logger.dart';
 
 class InitPage extends StatefulWidget {
   const InitPage({super.key});
@@ -19,9 +25,37 @@ class _InitPageState extends State<InitPage> {
 
   @override
   void initState() {
+    _fvpInit();
     _pluginInit();
     _webDavInit();
+    _update();
     super.initState();
+  }
+
+  _fvpInit() async {
+    bool hAenable =
+        await setting.get(SettingBoxKey.hAenable, defaultValue: true);
+    if (hAenable) {
+      fvp.registerWith(options: {
+        'platforms': ['windows', 'linux'],
+        'player': {
+          'avio.reconnect': '1',
+          'avio.reconnect_delay_max': '7',
+          'buffer': '2000+150000',
+          'demux.buffer.ranges': '8',
+        }
+      });
+    } else {
+      fvp.registerWith(options: {
+        'video.decoders': ['FFmpeg'],
+        'player': {
+          'avio.reconnect': '1',
+          'avio.reconnect_delay_max': '7',
+          'buffer': '2000+150000',
+          'demux.buffer.ranges': '8',
+        }
+      });
+    }
   }
 
   _webDavInit() async {
@@ -31,49 +65,52 @@ class _InitPageState extends State<InitPage> {
         setting.get(SettingBoxKey.webDavEnableFavorite, defaultValue: false);
     if (webDavEnable) {
       var webDav = WebDav();
-      debugPrint('开始从WEBDAV同步记录');
+      KazumiLogger().log(Level.info, '开始从WEBDAV同步记录');
       try {
         await webDav.init();
         try {
           await webDav.downloadHistory();
-          debugPrint('同步观看记录完成');
+          KazumiLogger().log(Level.info, '同步观看记录完成');
         } catch (e) {
-          debugPrint('同步观看记录失败 ${e.toString()}');
+          KazumiLogger().log(Level.error, '同步观看记录失败 ${e.toString()}');
         }
         if (webDavEnableFavorite) {
           try {
             await webDav.downloadFavorite();
-            debugPrint('同步追番列表完成');
+            KazumiLogger().log(Level.info, '同步追番列表完成');
           } catch (e) {
-            debugPrint('同步追番列表失败 ${e.toString()}');
+            KazumiLogger().log(Level.error, '同步追番列表失败 ${e.toString()}');
           }
         }
       } catch (e) {
-        debugPrint('初始化WebDav失败 ${e.toString()}');
+        KazumiLogger().log(Level.error, '初始化WebDav失败 ${e.toString()}');
       }
     }
   }
 
   _pluginInit() async {
+    String statementsText = '';
     try {
       pluginsController.queryPluginHTTPList();
       await pluginsController.loadPlugins();
+      statementsText =
+          await rootBundle.loadString("assets/statements/statements.txt");
     } catch (_) {}
     if (pluginsController.pluginList.isEmpty) {
       SmartDialog.show(
-        animationType: SmartAnimationType.centerFade_otherSlide,
+        useAnimation: false,
         builder: (context) {
           return AlertDialog(
-            title: const Text('插件管理'),
-            content: const Text('当前规则数为0, 是否加载示例规则'),
+            title: const Text('免责声明'),
+            scrollable: true,
+            content: Text(statementsText),
             actions: [
               TextButton(
                 onPressed: () {
-                  SmartDialog.dismiss();
-                  Modular.to.navigate('/tab/popular/');
+                  exit(0);
                 },
                 child: Text(
-                  '取消',
+                  '退出',
                   style:
                       TextStyle(color: Theme.of(context).colorScheme.outline),
                 ),
@@ -87,7 +124,7 @@ class _InitPageState extends State<InitPage> {
                   SmartDialog.dismiss();
                   Modular.to.navigate('/tab/popular/');
                 },
-                child: const Text('确认'),
+                child: const Text('已阅读并同意'),
               ),
             ],
           );
@@ -95,6 +132,13 @@ class _InitPageState extends State<InitPage> {
       );
     } else {
       Modular.to.navigate('/tab/popular/');
+    }
+  }
+
+  _update() {
+    bool autoUpdate = setting.get(SettingBoxKey.autoUpdate, defaultValue: true);
+    if (autoUpdate) {
+      Modular.get<MyController>().checkUpdata(type: 'auto');
     }
   }
 
@@ -107,9 +151,9 @@ class _InitPageState extends State<InitPage> {
                 MediaQuery.of(context).size.longestSide >=
             9 / 16);
     if (isWideScreen) {
-      debugPrint('当前设备宽屏');
+      KazumiLogger().log(Level.info, '当前设备宽屏');
     } else {
-      debugPrint('当前设备非宽屏');
+      KazumiLogger().log(Level.info, '当前设备非宽屏');
     }
     setting.put(SettingBoxKey.isWideScreen, isWideScreen);
     return const RouterOutlet();

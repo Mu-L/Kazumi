@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:hive/hive.dart';
 import 'package:kazumi/utils/storage.dart';
+import 'package:logger/logger.dart';
+import 'package:kazumi/utils/logger.dart';
 
 class SetDiaplayMode extends StatefulWidget {
   const SetDiaplayMode({super.key});
@@ -42,9 +44,7 @@ class _SetDiaplayModeState extends State<SetDiaplayMode> {
   Future<void> init() async {
     try {
       modes = await FlutterDisplayMode.supported;
-    } on PlatformException catch (e) {
-      debugPrint(e.toString());
-    }
+    } on PlatformException catch (_) {}
     var res = await getDisplayModeType(modes);
 
     preferred = modes.toList().firstWhere((el) => el == res);

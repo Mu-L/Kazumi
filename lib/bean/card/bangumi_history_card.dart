@@ -9,6 +9,8 @@ import 'package:kazumi/pages/favorite/favorite_controller.dart';
 import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
+import 'package:logger/logger.dart';
+import 'package:kazumi/utils/logger.dart';
 
 // 视频历史记录卡片 - 水平布局
 class BangumiHistoryCardV extends StatefulWidget {
@@ -62,9 +64,9 @@ class _BangumiHistoryCardVState extends State<BangumiHistoryCardV> {
               await infoController.queryRoads(widget.historyItem.lastSrc,
                   videoPageController.currentPlugin.name);
               SmartDialog.dismiss();
-              Modular.to.pushNamed('/tab/video/');
+              Modular.to.pushNamed('/video/');
             } catch (e) {
-              debugPrint(e.toString());
+              KazumiLogger().log(Level.warning, e.toString());
               SmartDialog.dismiss();
             }
           },

@@ -46,7 +46,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     });
     return PopScope(
       canPop: true,
-      onPopInvoked: (bool didPop) async {
+      onPopInvokedWithResult: (bool didPop, Object? result) {
         onBackPressed(context);
       },
       child: const Scaffold(
@@ -60,6 +60,13 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                 setKey: SettingBoxKey.enableGitProxy,
                 needReboot: true,
                 defaultVal: false,
+              ),
+            ),
+            InkWell(
+              child: SetSwitchItem(
+                title: '自动更新',
+                setKey: SettingBoxKey.autoUpdate,
+                defaultVal: true,
               ),
             ),
           ],

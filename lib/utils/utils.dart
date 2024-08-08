@@ -10,9 +10,44 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:kazumi/request/api.dart';
+import 'package:screen_pixel/screen_pixel.dart';
 
 class Utils {
   static final Random random = Random();
+
+  static Future<bool> isLowResolution() async {
+    try {
+      Map<String, double>? screenInfo = await getScreenInfo();
+      if (screenInfo != null) {
+        if (screenInfo['height']! / screenInfo['ratio']! < 900) {
+          return true;
+        }
+      } 
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<Map<String, double>?> getScreenInfo() async {
+    final screenPixelPlugin = ScreenPixel();
+    Map<String, double>? screenResolution;
+    final MediaQueryData mediaQuery = MediaQueryData.fromView(WidgetsBinding.instance.platformDispatcher.views.first);
+    final double screenRatio = mediaQuery.devicePixelRatio;
+    Map<String, double>? screenInfo = {};
+
+    try {
+      screenResolution = await screenPixelPlugin.getResolution();
+      screenInfo = {
+        'width': screenResolution['width']!,
+        'height': screenResolution['height']!,
+        'ratio': screenRatio
+      };
+    } on PlatformException {
+      screenInfo = null;
+    }
+    return screenInfo;
+  }
 
   static Future<String> getCookiePath() async {
     final Directory tempDir = await getApplicationSupportDirectory();
@@ -325,9 +360,16 @@ class Utils {
 
   static String durationToString(Duration duration) {
     String pad(int n) => n.toString().padLeft(2, '0');
+    var hours = pad(duration.inHours % 24);
     var minutes = pad(duration.inMinutes % 60);
     var seconds = pad(duration.inSeconds % 60);
-    return "$minutes:$seconds";
+    if(hours == "00"){
+      return "$minutes:$seconds";
+    }
+    else{
+      return "$hours:$minutes:$seconds";
+    }
+
   }
 
   static Future<String> latest() async {

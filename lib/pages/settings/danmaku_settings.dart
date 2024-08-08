@@ -77,13 +77,21 @@ class _DanmakuSettingsPageState extends State<DanmakuSettingsPage> {
     });
     return PopScope(
       canPop: true,
-      onPopInvoked: (bool didPop) async {
+      onPopInvokedWithResult: (bool didPop, Object? result) {
         onBackPressed(context);
       },
       child: Scaffold(
         appBar: const SysAppBar(title: Text('弹幕设置')),
-        body: Column(
+        body: ListView(
           children: [
+            const InkWell(
+              child: SetSwitchItem(
+                title: '默认开启',
+                subTitle: '默认是否随视频播放弹幕',
+                setKey: SettingBoxKey.danmakuEnabledByDefault,
+                defaultVal: false,
+              ),
+            ),
             const InkWell(
               child: SetSwitchItem(
                 title: '弹幕描边',

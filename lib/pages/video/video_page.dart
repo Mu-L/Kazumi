@@ -8,12 +8,15 @@ import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/pages/webview/webview_item.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
 import 'package:kazumi/pages/webview_desktop/webview_desktop_item.dart';
-import 'package:kazumi/pages/webview_desktop/webview_desktop_controller.dart';
+import 'package:kazumi/pages/webview_linux/webview_linux_item.dart';
+import 'package:logger/logger.dart';
+import 'package:kazumi/utils/logger.dart';
 import 'package:kazumi/pages/player/player_item.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:hive/hive.dart';
 import 'package:kazumi/utils/storage.dart';
 import 'package:kazumi/utils/utils.dart';
+import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class VideoPage extends StatefulWidget {
@@ -38,24 +41,31 @@ class _VideoPageState extends State<VideoPage>
   void initState() {
     super.initState();
     WakelockPlus.enable();
+    if (Platform.isAndroid || Platform.isIOS) {
+      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarDividerColor: Colors.black,
+        statusBarColor: Colors.black,
+      ));
+    }
     videoPageController.currentEspisode = 1;
     videoPageController.currentRoad = 0;
     videoPageController.historyOffset = 0;
-    playResume = setting.get(SettingBoxKey.playResume, defaultValue: false);
+    playResume = setting.get(SettingBoxKey.playResume, defaultValue: true);
     var progress = historyController.lastWatching(
         infoController.bangumiItem, videoPageController.currentPlugin.name);
     if (progress != null) {
-      debugPrint('尝试恢复观看进度');
+      // debugPrint('尝试恢复观看进度');
       if (videoPageController.roadList.length > progress.road) {
-        debugPrint('播放列表选择恢复');
+        // debugPrint('播放列表选择恢复');
         if (videoPageController.roadList[progress.road].data.length >=
             progress.episode) {
-          debugPrint('选集进度恢复');
+          // debugPrint('选集进度恢复');
           videoPageController.currentEspisode = progress.episode;
           videoPageController.currentRoad = progress.road;
           if (playResume) {
             videoPageController.historyOffset = progress.progress.inSeconds;
-            debugPrint('上次观看位置 ${videoPageController.historyOffset}');
+            // debugPrint('上次观看位置 ${videoPageController.historyOffset}');
           }
         }
       }
@@ -68,6 +78,13 @@ class _VideoPageState extends State<VideoPage>
 
   @override
   void dispose() {
+    if (Platform.isAndroid || Platform.isIOS) {
+      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        statusBarColor: Colors.transparent,
+      ));
+    }
     try {
       playerController.mediaPlayer.dispose();
     } catch (_) {}
@@ -220,7 +237,7 @@ class _VideoPageState extends State<VideoPage>
               : null,
           child: Platform.isWindows
               ? const WebviewDesktopItem()
-              : const WebviewItem(),
+              : (Platform.isLinux ? const WebviewLinuxItem() : const WebviewItem()),
         ))
       ],
     );
@@ -268,7 +285,7 @@ class _VideoPageState extends State<VideoPage>
                       clipBehavior: Clip.hardEdge,
                       child: InkWell(
                         onTap: () async {
-                          debugPrint('视频链接为 $urlItem');
+                          KazumiLogger().log(Level.info, '视频链接为 $urlItem');
                           videoPageController.changeEpisode(_count,
                               currentRoad: roadIndex);
                         },

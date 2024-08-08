@@ -2,11 +2,13 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:mobx/mobx.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:flutter/material.dart' show debugPrint;
 import 'package:path_provider/path_provider.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/request/plugin.dart';
 import 'package:kazumi/modules/plugin/plugin_http_module.dart';
+import 'package:logger/logger.dart';
+import 'package:path/path.dart' as path;
+import 'package:kazumi/utils/logger.dart';
 
 part 'plugins_controller.g.dart';
 
@@ -24,7 +26,7 @@ abstract class _PluginsController with Store {
 
     final directory = await getApplicationSupportDirectory();
     final pluginDirectory = Directory('${directory.path}/plugins');
-    debugPrint('插件目录 ${directory.path}/plugins');
+    KazumiLogger().log(Level.info, '插件目录 ${directory.path}/plugins');
 
     if (await pluginDirectory.exists()) {
       final jsonFiles = pluginDirectory
@@ -39,9 +41,9 @@ abstract class _PluginsController with Store {
         pluginList.add(Plugin.fromJson(data));
       }
 
-      debugPrint('当前插件数量 ${pluginList.length}');
+      KazumiLogger().log(Level.info, '当前插件数量 ${pluginList.length}');
     } else {
-      debugPrint('插件目录不存在');
+      KazumiLogger().log(Level.warning, '插件目录不存在');
     }
   }
 
@@ -67,7 +69,7 @@ abstract class _PluginsController with Store {
       await file.writeAsString(jsonString);
     }
 
-    debugPrint('已将 ${jsonFiles.length} 个插件文件拷贝到 ${pluginDirectory.path}');
+    KazumiLogger().log(Level.info, '已将 ${jsonFiles.length} 个插件文件拷贝到 ${pluginDirectory.path}');
   }
 
   Future<void> savePluginToJsonFile(Plugin plugin) async {
@@ -88,28 +90,37 @@ abstract class _PluginsController with Store {
     final jsonData = jsonEncode(plugin.toJson());
     await newFile.writeAsString(jsonData);
 
-    debugPrint('已创建插件文件 $fileName');
+    KazumiLogger().log(Level.info, '已创建插件文件 $fileName');
   }
 
-  Future<void> deletePluginJsonFile(Plugin plugin) async {
-    final directory = await getApplicationSupportDirectory();
-    final pluginDirectory = Directory('${directory.path}/plugins');
+Future<void> deletePluginJsonFile(Plugin plugin) async {
+  final directory = await getApplicationSupportDirectory();
+  final pluginDirectory = Directory('${directory.path}/plugins');
 
-    if (!await pluginDirectory.exists()) {
-      debugPrint('插件目录不存在，无法删除文件');
-      return;
-    }
+  if (!await pluginDirectory.exists()) {
+    KazumiLogger().log(Level.warning, '插件目录不存在，无法删除文件');
+    return;
+  }
 
-    final fileName = '${plugin.name}.json';
-    final file = File('${pluginDirectory.path}/$fileName');
+  final fileName = '${plugin.name}.json';
+  final files = pluginDirectory.listSync();
 
-    if (await file.exists()) {
-      await file.delete();
-      debugPrint('已删除插件文件 $fileName');
-    } else {
-      debugPrint('插件文件 $fileName 不存在');
+  // workaround for android/linux case insensitive
+  File? targetFile;
+  for (var file in files) {
+    if (file is File && path.basename(file.path).toLowerCase() == fileName.toLowerCase()) {
+      targetFile = file;
+      break;
     }
   }
+
+  if (targetFile != null) {
+    await targetFile.delete();
+    KazumiLogger().log(Level.info, '已删除插件文件 ${path.basename(targetFile.path)}');
+  } else {
+    KazumiLogger().log(Level.warning, '插件文件 $fileName 不存在');
+  }
+}
 
   Future<void> queryPluginHTTPList() async {
     var pluginHTTPListRes = await PluginHTTP.getPluginList();

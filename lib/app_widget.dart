@@ -9,6 +9,8 @@ import 'package:hive/hive.dart';
 import 'package:kazumi/utils/utils.dart';
 import 'package:kazumi/utils/storage.dart';
 import 'package:tray_manager/tray_manager.dart';
+import 'package:logger/logger.dart';
+import 'package:kazumi/utils/logger.dart';
 import 'package:window_manager/window_manager.dart';
 
 class AppWidget extends StatefulWidget {
@@ -56,12 +58,18 @@ class _AppWidgetState extends State<AppWidget> with TrayListener {
   }
 
   Future<void> _handleTray() async {
-    await trayManager.setIcon(
-      Platform.isWindows
-          ? 'assets/images/logo/logo_windows.ico'
-          : 'assets/images/logo/logo_rounded.png'
-    );
-    await trayManager.setToolTip('Kazumi');
+    if (Platform.isWindows) {
+      await trayManager.setIcon('assets/images/logo/logo_windows.ico');
+    } else if (Platform.environment.containsKey('FLATPAK_ID') || Platform.environment.containsKey('SNAP')) {
+      await trayManager.setIcon('io.github.predidit.kazumi');
+    } else {
+      await trayManager.setIcon('assets/images/logo/logo_rounded.png');
+    }
+
+    if (!Platform.isLinux) {
+      await trayManager.setToolTip('Kazumi');
+    }
+
     Menu trayMenu = Menu(
         items: [
           MenuItem(
@@ -137,7 +145,7 @@ class _AppWidgetState extends State<AppWidget> with TrayListener {
           FlutterDisplayMode.setPreferredMode(preferred);
         });
       } catch (e) {
-        debugPrint('高帧率设置失败 ${e.toString()}');
+        KazumiLogger().log(Level.error ,'高帧率设置失败 ${e.toString()}');
       }
     }
 

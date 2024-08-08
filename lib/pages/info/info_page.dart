@@ -1,4 +1,3 @@
-import 'package:kazumi/utils/utils.dart';
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -9,12 +8,12 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/pages/popular/popular_controller.dart';
-import 'package:kazumi/pages/menu/menu.dart';
-import 'package:kazumi/pages/menu/side_menu.dart';
-import 'package:provider/provider.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/appbar/sys_app_bar.dart';
 import 'package:kazumi/request/query_manager.dart';
+import 'package:logger/logger.dart';
+import 'package:kazumi/utils/logger.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class InfoPage extends StatefulWidget {
   const InfoPage({super.key});
@@ -30,7 +29,6 @@ class _InfoPageState extends State<InfoPage>
       Modular.get<VideoPageController>();
   final PluginsController pluginsController = Modular.get<PluginsController>();
   final PopularController popularController = Modular.get<PopularController>();
-  dynamic navigationBarState;
   late TabController tabController;
 
   /// 用于并发查询
@@ -43,17 +41,6 @@ class _InfoPageState extends State<InfoPage>
     queryManager.querySource(popularController.keyword);
     tabController =
         TabController(length: pluginsController.pluginList.length, vsync: this);
-    if (Utils.isCompact()) {
-      navigationBarState =
-          Provider.of<NavigationBarState>(context, listen: false);
-    } else {
-      navigationBarState =
-          Provider.of<SideNavigationBarState>(context, listen: false);
-    }
-  }
-
-  void onBackPressed(BuildContext context) {
-    navigationBarState.showNavigate();
   }
 
   @override
@@ -82,14 +69,8 @@ class _InfoPageState extends State<InfoPage>
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      navigationBarState.hideNavigate();
-    });
     return PopScope(
       canPop: true,
-      onPopInvoked: (bool didPop) {
-        onBackPressed(context);
-      },
       child: Stack(
         children: [
           Positioned.fill(
@@ -110,91 +91,120 @@ class _InfoPageState extends State<InfoPage>
             ),
           ),
           Scaffold(
-            backgroundColor: Colors.transparent,
-            appBar: const SysAppBar(backgroundColor: Colors.transparent),
-            body: Column(
-              children: [
-                BangumiInfoCardV(bangumiItem: infoController.bangumiItem),
-                TabBar(
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.center,
-                  controller: tabController,
-                  tabs: pluginsController.pluginList
-                      .map((plugin) => Observer(
-                            builder: (context) => Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  plugin.name,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(width: 5.0),
-                                Container(
-                                  width: 8.0,
-                                  height: 8.0,
-                                  decoration: BoxDecoration(
-                                    color: infoController.pluginSearchStatus[
-                                                plugin.name] ==
-                                            'success'
-                                        ? Colors.green
-                                        : (infoController.pluginSearchStatus[
-                                                    plugin.name] ==
-                                                'pending')
-                                            ? Colors.grey
-                                            : Colors.red,
-                                    shape: BoxShape.circle,
+              backgroundColor: Colors.transparent,
+              appBar: const SysAppBar(backgroundColor: Colors.transparent),
+              body: Column(
+                children: [
+                  BangumiInfoCardV(bangumiItem: infoController.bangumiItem),
+                  TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.center,
+                    controller: tabController,
+                    tabs: pluginsController.pluginList
+                        .map((plugin) => Observer(
+                              builder: (context) => Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    plugin.name,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                              ],
-                            ),
-                          ))
-                      .toList(),
-                ),
-                Expanded(
-                  child: Observer(
-                    builder: (context) => TabBarView(
-                      controller: tabController,
-                      children: List.generate(
-                          pluginsController.pluginList.length, (pluginIndex) {
-                        var plugin = pluginsController.pluginList[pluginIndex];
-                        var cardList = <Widget>[];
-                        for (var searchResponse
-                            in infoController.pluginSearchResponseList) {
-                          if (searchResponse.pluginName == plugin.name) {
-                            for (var searchItem in searchResponse.data) {
-                              cardList.add(Card(
-                                color: Colors.transparent,
-                                child: ListTile(
-                                  tileColor: Colors.transparent,
-                                  title: Text(searchItem.name),
-                                  onTap: () async {
-                                    SmartDialog.showLoading(msg: '获取中');
-                                    videoPageController.currentPlugin = plugin;
-                                    videoPageController.title = searchItem.name;
-                                    videoPageController.src = searchItem.src;
-                                    try {
-                                      await infoController.queryRoads(
-                                          searchItem.src, plugin.name);
-                                      SmartDialog.dismiss();
-                                      Modular.to.pushNamed('/tab/video/');
-                                    } catch (e) {
-                                      debugPrint(e.toString());
-                                      SmartDialog.dismiss();
-                                    }
-                                  },
-                                ),
-                              ));
+                                  const SizedBox(width: 5.0),
+                                  Container(
+                                    width: 8.0,
+                                    height: 8.0,
+                                    decoration: BoxDecoration(
+                                      color: infoController.pluginSearchStatus[
+                                                  plugin.name] ==
+                                              'success'
+                                          ? Colors.green
+                                          : (infoController.pluginSearchStatus[
+                                                      plugin.name] ==
+                                                  'pending')
+                                              ? Colors.grey
+                                              : Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                  Expanded(
+                    child: Observer(
+                      builder: (context) => TabBarView(
+                        controller: tabController,
+                        children: List.generate(
+                            pluginsController.pluginList.length, (pluginIndex) {
+                          var plugin =
+                              pluginsController.pluginList[pluginIndex];
+                          var cardList = <Widget>[];
+                          for (var searchResponse
+                              in infoController.pluginSearchResponseList) {
+                            if (searchResponse.pluginName == plugin.name) {
+                              for (var searchItem in searchResponse.data) {
+                                cardList.add(Card(
+                                  color: Colors.transparent,
+                                  child: ListTile(
+                                    tileColor: Colors.transparent,
+                                    title: Text(searchItem.name),
+                                    onTap: () async {
+                                      SmartDialog.showLoading(msg: '获取中');
+                                      videoPageController.currentPlugin =
+                                          plugin;
+                                      videoPageController.title =
+                                          searchItem.name;
+                                      videoPageController.src = searchItem.src;
+                                      try {
+                                        await infoController.queryRoads(
+                                            searchItem.src, plugin.name);
+                                        SmartDialog.dismiss();
+                                        Modular.to.pushNamed('/video/');
+                                      } catch (e) {
+                                        KazumiLogger()
+                                            .log(Level.error, e.toString());
+                                        SmartDialog.dismiss();
+                                      }
+                                    },
+                                  ),
+                                ));
+                              }
                             }
                           }
-                        }
-                        return ListView(children: cardList);
-                      }),
+                          return ListView(children: cardList);
+                        }),
+                      ),
                     ),
-                  ),
-                )
-              ],
-            ),
-          ),
+                  )
+                ],
+              ),
+              floatingActionButton: FloatingActionButton(
+                onPressed: () {
+                  int currentIndex = tabController.index;
+                  SmartDialog.show(
+                      useAnimation: false,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text('退出确认'),
+                          content: const Text('您想要离开 Kazumi 并在浏览器中打开此视频源吗？'),
+                          actions: [
+                            TextButton(
+                                onPressed: () {
+                                  SmartDialog.dismiss();
+                                  launchUrl(Uri.parse(pluginsController.pluginList[currentIndex].baseUrl));
+                                },
+                                child: const Text('确认')),
+                            const TextButton(
+                                onPressed: SmartDialog.dismiss,
+                                child: Text('取消')),
+                          ],
+                        );
+                      });
+                  // print('Current Tab Index: $currentIndex');
+                },
+                child: const Icon(Icons.open_in_browser),
+              )),
         ],
       ),
     );

@@ -41,7 +41,7 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
     });
     return PopScope(
       canPop: true,
-      onPopInvoked: (bool didPop) async {
+      onPopInvokedWithResult: (bool didPop, Object? result) {
         onBackPressed(context);
       },
       child: const Scaffold(
@@ -52,6 +52,7 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
               child: SetSwitchItem(
                 title: '硬件解码',
                 setKey: SettingBoxKey.hAenable,
+                needReboot: true,
                 defaultVal: true,
               ),
             ),
@@ -60,7 +61,7 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
                 title: '自动跳转',
                 subTitle: '跳转到上次播放位置',
                 setKey: SettingBoxKey.playResume,
-                defaultVal: false,
+                defaultVal: true,
               ),
             ),
           ],

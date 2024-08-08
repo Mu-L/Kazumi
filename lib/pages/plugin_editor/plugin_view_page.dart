@@ -136,7 +136,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
     });
     return PopScope(
       canPop: true,
-      onPopInvoked: (bool didPop) {
+      onPopInvokedWithResult: (bool didPop, Object? result) {
         onBackPressed(context);
       },
       child: Scaffold(

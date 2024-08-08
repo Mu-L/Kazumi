@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/pages/router.dart';
 import 'package:provider/provider.dart';
-import 'package:kazumi/pages/my/my_controller.dart';
 
 class SideMenu extends StatefulWidget {
   //const SideMenu({Key? key}) : super(key: key);
@@ -24,7 +23,6 @@ class SideNavigationBarState extends ChangeNotifier {
   }
 
   void hideNavigate() {
-    debugPrint('尝试隐藏侧边栏');
     _isRailVisible = false;
     notifyListeners();
   }
@@ -37,7 +35,6 @@ class SideNavigationBarState extends ChangeNotifier {
 
 class _SideMenu extends State<SideMenu> {
   final PageController _page = PageController();
-  final _mineController = Modular.get<MyController>();
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +107,7 @@ class _SideMenu extends State<SideMenu> {
               child: Container(
                 color: Theme.of(context).colorScheme.primaryContainer,
                 child: PageView.builder(
-                  controller: _page,
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: menu.size,
                   onPageChanged: (i) =>
                       Modular.to.navigate("/tab${menu.getPath(i)}/"),

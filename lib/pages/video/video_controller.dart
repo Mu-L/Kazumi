@@ -3,17 +3,18 @@ import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/plugins/plugins.dart';
-import 'package:flutter/material.dart' show debugPrint;
 import 'package:kazumi/pages/webview/webview_controller.dart';
 import 'package:kazumi/pages/webview_desktop/webview_desktop_controller.dart';
+import 'package:kazumi/pages/webview_linux/webview_linux_controller.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
-import 'package:auto_orientation/auto_orientation.dart';
 import 'package:kazumi/utils/utils.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:mobx/mobx.dart';
+import 'package:logger/logger.dart';
+import 'package:kazumi/utils/logger.dart';
 
 part 'video_controller.g.dart';
 
@@ -57,7 +58,7 @@ abstract class _VideoPageController with Store {
     currentEspisode = episode;
     this.currentRoad = currentRoad;
     logLines.clear();
-    debugPrint('跳转到第$episode话');
+    KazumiLogger().log(Level.info, '跳转到第$episode话');
     String urlItem = roadList[currentRoad].data[episode - 1];
     if (urlItem.contains(currentPlugin.baseUrl) || urlItem.contains(currentPlugin.baseUrl.replaceAll('https', 'http'))) {
       urlItem = urlItem;
@@ -72,7 +73,12 @@ abstract class _VideoPageController with Store {
           Modular.get<WebviewDesktopItemController>();
       await webviewDesktopItemController
           .loadUrl(urlItem, offset: offset);
-    } else {
+    } 
+    if (Platform.isLinux) {
+      final WebviewLinuxItemController webviewLinuxItemController = Modular.get<WebviewLinuxItemController>();
+      await webviewLinuxItemController.loadUrl(urlItem, offset:  offset);
+    }
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
       final WebviewItemController webviewItemController =
           Modular.get<WebviewItemController>();
       await webviewItemController.loadUrl(urlItem, offset: offset);
@@ -95,7 +101,7 @@ abstract class _VideoPageController with Store {
 
   //退出全屏显示
   Future<void> exitFullScreen() async {
-    debugPrint('退出全屏模式');
+    // debugPrint('退出全屏模式');
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       await windowManager.setFullScreen(false);
     }
@@ -117,16 +123,11 @@ abstract class _VideoPageController with Store {
         if (Utils.isCompact()) {
           verticalScreen();
         }
-      } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-        await const MethodChannel('com.alexmercerind/media_kit_video')
-            .invokeMethod(
-          'Utils.ExitNativeFullscreen',
-        );
-        // verticalScreen();
       }
     } catch (exception, stacktrace) {
-      debugPrint(exception.toString());
-      debugPrint(stacktrace.toString());
+      // debugPrint(exception.toString());
+      // debugPrint(stacktrace.toString());
+      KazumiLogger().log(Level.error, exception.toString(), stackTrace: stacktrace);
     }
   }
 
@@ -141,22 +142,18 @@ abstract class _VideoPageController with Store {
         //   SystemUiMode.immersiveSticky,
         //   overlays: [],
         // );
-        // await SystemChrome.setPreferredOrientations(
-        //   [
-        //     DeviceOrientation.landscapeLeft,
-        //     DeviceOrientation.landscapeRight,
-        //   ],
-        // );
-        await AutoOrientation.landscapeAutoMode(forceSensor: true);
-      } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-        await const MethodChannel('com.alexmercerind/media_kit_video')
-            .invokeMethod(
-          'Utils.EnterNativeFullscreen',
+        await SystemChrome.setPreferredOrientations(
+          [
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ],
         );
+        // await AutoOrientation.landscapeAutoMode(forceSensor: true);
       }
     } catch (exception, stacktrace) {
-      debugPrint(exception.toString());
-      debugPrint(stacktrace.toString());
+      // debugPrint(exception.toString());
+      // debugPrint(stacktrace.toString());
+      KazumiLogger().log(Level.error, exception.toString(), stackTrace: stacktrace);
     }
   }
 

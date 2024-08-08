@@ -12,7 +12,8 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:kazumi/bean/appbar/sys_app_bar.dart';
-import 'package:animated_search_bar/animated_search_bar.dart';
+import 'package:logger/logger.dart';
+import 'package:kazumi/utils/logger.dart';
 
 class PopularPage extends StatefulWidget {
   const PopularPage({super.key});
@@ -26,8 +27,11 @@ class _PopularPageState extends State<PopularPage>
   DateTime? _lastPressedAt;
   bool timeout = false;
   bool searchLoading = false;
+  bool showTagFilter = true;
+  bool showSearchBar = false;
   final FocusNode _focusNode = FocusNode();
   final ScrollController scrollController = ScrollController();
+  final TextEditingController keywordController = TextEditingController();
   final PopularController popularController = Modular.get<PopularController>();
 
   @override
@@ -36,7 +40,6 @@ class _PopularPageState extends State<PopularPage>
   @override
   void initState() {
     super.initState();
-    debugPrint('Popular初始化成功');
     timeout = false;
     scrollController.addListener(() {
       popularController.scrollOffset = scrollController.offset;
@@ -44,12 +47,12 @@ class _PopularPageState extends State<PopularPage>
               scrollController.position.maxScrollExtent - 200 &&
           popularController.isLoadingMore == false &&
           popularController.searchKeyword == '') {
-        debugPrint('Popular 正在加载更多');
+        KazumiLogger().log(Level.info, 'Popular 正在加载更多');
         popularController.queryBangumiListFeed(type: 'onload');
       }
     });
     if (popularController.bangumiList.isEmpty) {
-      debugPrint('Popular缓存列表为空, 尝试重加载');
+      // KazumiLogger().log(Level.info, 'Popular缓存列表为空, 尝试重加载');
       Timer(const Duration(seconds: 3), () {
         timeout = true;
       });
@@ -59,11 +62,9 @@ class _PopularPageState extends State<PopularPage>
 
   @override
   void dispose() {
-    popularController.keyword = '';
     popularController.searchKeyword = '';
     _focusNode.dispose();
     scrollController.removeListener(() {});
-    debugPrint('popular 模块已卸载, 监听器移除');
     super.dispose();
   }
 
@@ -89,12 +90,16 @@ class _PopularPageState extends State<PopularPage>
     });
     return PopScope(
       canPop: false,
-      onPopInvoked: (bool didPop) async {
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) {
+          return;
+        }
         onBackPressed(context);
       },
       child: RefreshIndicator(
         onRefresh: () async {
-          await popularController.queryBangumiListFeed();
+          await popularController.queryBangumiListFeed(
+              tag: popularController.currentTag);
         },
         child: Scaffold(
             appBar: SysAppBar(
@@ -122,105 +127,151 @@ class _PopularPageState extends State<PopularPage>
                       child: Container(),
                     ),
                   ),
-                  AnimatedSearchBar(
-                    searchDecoration: const InputDecoration(
-                      alignLabelWithHint: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Visibility(
+                          visible: showSearchBar,
+                          child: TextFormField(
+                            focusNode: _focusNode,
+                            cursorColor: Theme.of(context).colorScheme.primary,
+                            decoration: const InputDecoration(
+                              alignLabelWithHint: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                  vertical: 8, horizontal: 8),
+                              border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(8)),
+                              ),
+                            ),
+                            style: TextStyle(
+                                color:
+                                    isLight ? Colors.black87 : Colors.white70),
+                            onChanged: (_) {
+                              scrollController.jumpTo(0.0);
+                            },
+                            controller: keywordController,
+                            onFieldSubmitted: (t) async {
+                              setState(() {
+                                searchLoading = true;
+                                popularController.currentTag = '';
+                              });
+                              if (t != '') {
+                                popularController.searchKeyword = t;
+                                await popularController.queryBangumi(
+                                    popularController.searchKeyword);
+                              } else {
+                                popularController.searchKeyword = '';
+                                await popularController.queryBangumiListFeed();
+                              }
+                              setState(() {
+                                searchLoading = false;
+                              });
+                            },
+                          ),
+                        ),
                       ),
-                    ),
-                    searchStyle: TextStyle(
-                        color: isLight ? Colors.black87 : Colors.white70),
-                    onChanged: (_) {
-                      scrollController.jumpTo(0.0);
-                    },
-                    onFieldSubmitted: (t) async {
-                      setState(() {
-                        searchLoading = true;
-                      });
-                      if (t != '') {
-                        popularController.searchKeyword = t;
-                        await popularController
-                            .queryBangumi(popularController.searchKeyword);
-                      } else {
-                        popularController.searchKeyword = '';
-                        await popularController.queryBangumiListFeed();
-                      }
-                      setState(() {
-                        searchLoading = false;
-                      });
-                    },
-                    onClose: () async {
-                      setState(() {
-                        searchLoading = true;
-                      });
-                      popularController.searchKeyword = '';
-                      await popularController.queryBangumiListFeed();
-                      setState(() {
-                        searchLoading = false;
-                      });
-                    },
+                      IconButton(
+                          onPressed: () async {
+                            if (!showSearchBar) {
+                              setState(() {
+                                showSearchBar = true;
+                              });
+                              _focusNode.requestFocus();
+                            } else {
+                              if (keywordController.text == '') {
+                                _focusNode.unfocus();
+                                setState(() {
+                                  showSearchBar = false;
+                                  searchLoading = true;
+                                  popularController.currentTag = '';
+                                });
+                                popularController.searchKeyword == '';
+                                await popularController.queryBangumiListFeed();
+                                setState(() {
+                                  searchLoading = false;
+                                });
+                              } else {
+                                keywordController.text = '';
+                                popularController.searchKeyword = '';
+                                _focusNode.requestFocus();
+                              }
+                            }
+                          },
+                          icon: showSearchBar
+                              ? const Icon(Icons.close)
+                              : const Icon(Icons.search))
+                    ],
                   ),
                 ],
               ),
             ),
-            body: CustomScrollView(
-              controller: scrollController,
-              slivers: [
-                SliverToBoxAdapter(
+            body: Column(
+              children: [
+                SizedBox(
+                  height: showTagFilter ? 50 : 0,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 0, bottom: 10, left: 0),
-                    // child: Row(
-                    //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    //   children: [
-                    //     Text(
-                    //       '每日放送',
-                    //       style: Theme.of(context).textTheme.titleMedium,
-                    //     ),
-                    //   ],
-                    // ),
-                    child: searchLoading
-                        ? const LinearProgressIndicator()
-                        : Container(),
+                    padding: const EdgeInsets.fromLTRB(0, 0, 14, 0),
+                    child: tagFilter(),
                   ),
                 ),
-                SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                        StyleString.safeSpace, 0, StyleString.safeSpace, 0),
-                    sliver: Observer(builder: (context) {
-                      if (popularController.bangumiList.isEmpty &&
-                          timeout == true) {
-                        return HttpError(
-                          errMsg: '什么都没有找到 (´;ω;`)',
-                          fn: () {
-                            popularController.queryBangumiListFeed();
-                          },
-                        );
-                      }
-                      if (popularController.bangumiList.isEmpty &&
-                          timeout == false) {
-                        return const SliverToBoxAdapter(
-                          child: SizedBox(
-                              height: 600,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  CircularProgressIndicator(),
-                                ],
-                              )),
-                        );
-                      }
-                      return contentGrid(popularController.bangumiList);
-                    })),
+                Expanded(
+                  child: CustomScrollView(
+                    controller: scrollController,
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                              top: 0, bottom: 10, left: 0),
+                          child: searchLoading
+                              ? const LinearProgressIndicator()
+                              : Container(),
+                        ),
+                      ),
+                      SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(
+                              StyleString.safeSpace,
+                              0,
+                              StyleString.safeSpace,
+                              0),
+                          sliver: Observer(builder: (context) {
+                            if (popularController.bangumiList.isEmpty &&
+                                timeout == true) {
+                              return HttpError(
+                                errMsg: '什么都没有找到 (´;ω;`)',
+                                fn: () {
+                                  popularController.queryBangumiListFeed();
+                                },
+                              );
+                            }
+                            if (popularController.bangumiList.isEmpty &&
+                                timeout == false) {
+                              return SliverToBoxAdapter(
+                                child: SizedBox(
+                                    height:
+                                        (MediaQuery.of(context).size.height /
+                                            2),
+                                    child: const Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        CircularProgressIndicator(),
+                                      ],
+                                    )),
+                              );
+                            }
+                            return contentGrid(popularController.bangumiList);
+                          })),
+                    ],
+                  ),
+                ),
               ],
             ),
             floatingActionButton: FloatingActionButton(
               onPressed: () {
                 scrollController.jumpTo(0.0);
-                popularController.scrollOffset = 0.0;
               },
               child: const Icon(Icons.arrow_upward),
             )
@@ -251,6 +302,98 @@ class _PopularPageState extends State<PopularPage>
         },
         childCount: bangumiList!.isNotEmpty ? bangumiList!.length : 10,
       ),
+    );
+  }
+
+  Widget tagFilter() {
+    List<String> tags = [
+      '日常',
+      '原创',
+      '校园',
+      '搞笑',
+      '奇幻',
+      '百合',
+      '异世界',
+      '恋爱',
+      '悬疑',
+      '热血',
+      '后宫',
+      '机战',
+      '轻改',
+      '偶像',
+      '治愈',
+    ];
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: tags.length,
+            itemBuilder: (context, index) {
+              final filter = tags[index];
+              return Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8, left: 8),
+                child: filter == popularController.currentTag
+                    ? FilledButton(
+                        child: Text(filter),
+                        onPressed: () async {
+                          scrollController.jumpTo(0.0);
+                          setState(() {
+                            popularController.currentTag = '';
+                            searchLoading = true;
+                          });
+                          await popularController.queryBangumiListFeed(
+                            tag: popularController.currentTag,
+                          );
+                          setState(() {
+                            searchLoading = false;
+                          });
+                        },
+                      )
+                    : FilledButton.tonal(
+                        child: Text(filter),
+                        onPressed: () async {
+                          _focusNode.unfocus();
+                          scrollController.jumpTo(0.0);
+                          setState(() {
+                            popularController.currentTag = filter;
+                            keywordController.text = '';
+                            showSearchBar = false;
+                            searchLoading = true;
+                          });
+                          await popularController.queryBangumiListFeed(
+                            tag: popularController.currentTag,
+                          );
+                          setState(() {
+                            searchLoading = false;
+                          });
+                        },
+                      ),
+              );
+            },
+          ),
+        ),
+        // Tooltip(
+        //   message: '重设列表',
+        //   child: IconButton(
+        //     icon: const Icon(Icons.clear_all),
+        //     onPressed: () async {
+        //       if (popularController.currentTag != '') {
+        //         setState(() {
+        //           popularController.currentTag = '';
+        //           searchLoading = true;
+        //         });
+        //         await popularController.queryBangumiListFeed(
+        //           tag: popularController.currentTag,
+        //         );
+        //         setState(() {
+        //           searchLoading = false;
+        //         });
+        //       }
+        //     },
+        //   ),
+        // )
+      ],
     );
   }
 }
